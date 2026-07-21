@@ -3,7 +3,6 @@ version: "3.8"
 services:
   frontend:
     image: deva1605/frontend:latest
-    container_name: frontend
     ports:
       - "3000:5173"
     depends_on:
@@ -11,6 +10,5 @@ services:
 
   backend:
     image: deva1605/backend:latest
-    container_name: backend
     ports:
       - "5000:5000"
