@@ -1,8 +1,8 @@
 function App() {
   return (
-    <div>
+    <div className="container">
       <h1>CI/CD Pipeline Demo</h1>
-      <p>Frontend Working</p>
+      <p>React Frontend is Running 🚀</p>
     </div>
   );
 }
