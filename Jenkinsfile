@@ -78,7 +78,12 @@ pipeline {
         }
 
         failure {
-            echo "Pipeline Failed"
-        }
+        emailext(
+            subject: "Jenkins Build Failed: ${env.JOB_NAME}",
+            body: "Build #${env.BUILD_NUMBER} has failed.\nCheck: ${env.BUILD_URL}",
+            to: "baskardeva7@gmail.com"
+        )
+    }
+}
     }
 }
