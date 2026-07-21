@@ -1,110 +1,84 @@
 pipeline {
 
-agent any
+    agent any
 
-environment{
+    environment {
+        FRONTEND = "deva1605/frontend"
+        BACKEND  = "deva1605/backend"
+    }
 
-FRONTEND="deva1605/frontend"
-BACKEND="deva1605/backend"
+    stages {
 
-}
+        stage('Code Quality') {
+            steps {
+                echo "Running code quality..."
+            }
+        }
 
-stages{
+        stage('Test') {
+            steps {
+                echo "Running Tests..."
+            }
+        }
 
-stage('Clone'){
-steps{
-git 'https://github.com/deva16-cc/cicd-pipeline.git'
-}
-}
+        stage('Build Docker') {
+            steps {
+                sh 'docker build -t $FRONTEND frontend'
+                sh 'docker build -t $BACKEND backend'
+            }
+        }
 
-stage('Code Quality'){
-steps{
-echo "Running code quality..."
-}
-}
+        stage('Push Docker') {
+            steps {
 
-stage('Test'){
-steps{
-echo "Running Tests..."
-}
-}
+                withCredentials([usernamePassword(
+                    credentialsId: 'dockerhub',
+                    usernameVariable: 'USER',
+                    passwordVariable: 'PASS'
+                )]) {
 
-stage('Build Docker'){
-steps{
+                    sh 'echo $PASS | docker login -u $USER --password-stdin'
+                }
 
-sh 'docker build -t $FRONTEND frontend'
-sh 'docker build -t $BACKEND backend'
+                sh 'docker push $FRONTEND'
+                sh 'docker push $BACKEND'
+            }
+        }
 
-}
-}
+        stage('Deploy Dev') {
+            steps {
+                sh 'docker compose up -d'
+            }
+        }
 
-stage('Push Docker'){
-steps{
+        stage('Health Check') {
+            steps {
+                sh 'curl http://localhost:5000/health'
+            }
+        }
 
-withCredentials([usernamePassword(credentialsId:'dockerhub',
-usernameVariable:'USER',
-passwordVariable:'PASS')]){
+        stage('Production Approval') {
+            steps {
+                input "Deploy Production?"
+            }
+        }
 
-sh 'echo $PASS | docker login -u $USER --password-stdin'
+        stage('Production Deploy') {
+            steps {
+                echo "Deploying Production"
+            }
+        }
+    }
 
-}
+    post {
 
-sh 'docker push $FRONTEND'
-sh 'docker push $BACKEND'
+        success {
+            echo "Pipeline Success"
+            archiveArtifacts artifacts: '**/*', allowEmptyArchive: true
+        }
 
-}
-}
-
-stage('Deploy Dev'){
-steps{
-
-sh 'docker compose up -d'
-
-}
-}
-
-stage('Health Check'){
-steps{
-
-sh 'curl http://localhost:5000/health'
-
-}
-}
-
-stage('Production Approval'){
-steps{
-
-input "Deploy Production?"
-
-}
-}
-
-stage('Production Deploy'){
-steps{
-
-echo "Deploying Production"
-
-}
-}
-
-}
-
-post{
-
-failure{
-
-mail to:'baskardeva7@gmail.com',
-subject:'Pipeline Failed',
-body:'Check Jenkins'
-
-}
-
-success{
-
-archiveArtifacts '**/*'
-
-}
-
-}
-
+        failure {
+            echo "Pipeline Failed"
+        }
+    }
 }
