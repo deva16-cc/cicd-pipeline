@@ -13,7 +13,7 @@ stages{
 
 stage('Clone'){
 steps{
-git 'https://github.com/username/repository.git'
+git 'https://github.com/deva16-cc/cicd-pipeline.git'
 }
 }
 
