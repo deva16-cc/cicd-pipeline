@@ -109,40 +109,70 @@ pipeline {
 
     post {
 
-        success {
+    success {
 
-            echo "Pipeline Completed Successfully."
+        echo "Pipeline Completed Successfully."
 
-            archiveArtifacts artifacts: '**/*', allowEmptyArchive: true
-        }
+        archiveArtifacts artifacts: '**/*', allowEmptyArchive: true
 
-        failure {
+        emailext(
+            subject: "SUCCESS: ${env.JOB_NAME} #${env.BUILD_NUMBER}",
+            body: """
+Hello,
 
-            echo "Deployment Failed. Rolling Back..."
+The Jenkins pipeline has completed successfully.
 
-            sh '''
-            docker compose down || true
-            docker compose up -d || true
-            '''
+Job Name      : ${env.JOB_NAME}
+Build Number  : ${env.BUILD_NUMBER}
+Build Status  : SUCCESS
 
-            emailext(
-                subject: "Jenkins Build Failed - ${env.JOB_NAME}",
-                body: """
-Job Name : ${env.JOB_NAME}
-
-Build Number : ${env.BUILD_NUMBER}
-
-Build URL :
+Build URL:
 ${env.BUILD_URL}
 
-The deployment has failed and rollback has been executed.
-""",
-                to: "baskardeva7@gmail.com"
-            )
-        }
+Docker Images:
+- deva1605/frontend:latest
+- deva1605/backend:latest
 
-        always {
-            cleanWs()
-        }
+Regards,
+Jenkins CI/CD
+""",
+            to: "baskardeva7@gmail.com"
+        )
+    }
+
+    failure {
+
+        echo "Deployment Failed. Rolling Back..."
+
+        sh '''
+        docker compose down || true
+        docker compose up -d || true
+        '''
+
+        emailext(
+            subject: "FAILED: ${env.JOB_NAME} #${env.BUILD_NUMBER}",
+            body: """
+Hello,
+
+The Jenkins pipeline has failed.
+
+Job Name      : ${env.JOB_NAME}
+Build Number  : ${env.BUILD_NUMBER}
+Build Status  : FAILED
+
+Build URL:
+${env.BUILD_URL}
+
+Rollback has been executed automatically.
+
+Regards,
+Jenkins CI/CD
+""",
+            to: "baskardeva7@gmail.com"
+        )
+    }
+
+    always {
+        cleanWs()
     }
 }
