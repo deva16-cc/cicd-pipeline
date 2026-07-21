@@ -3,69 +3,106 @@ pipeline {
     agent any
 
     environment {
-        FRONTEND = "deva1605/frontend"
-        BACKEND  = "deva1605/backend"
+        FRONTEND = "deva1605/frontend:latest"
+        BACKEND  = "deva1605/backend:latest"
     }
 
     stages {
 
+        stage('Checkout') {
+            steps {
+                checkout scm
+            }
+        }
+
         stage('Code Quality') {
             steps {
-                echo "Running code quality..."
+                echo "Running Code Quality Checks..."
+                // Example:
+                // sh 'npm run lint'
+                // sh 'flake8 backend'
             }
         }
 
-        stage('Test') {
+        stage('Automated Tests') {
             steps {
                 echo "Running Tests..."
+                // Example:
+                // sh 'npm test'
+                // sh 'pytest'
             }
         }
 
-        stage('Build Docker') {
+        stage('Build Docker Images') {
             steps {
-                sh 'docker build -t $FRONTEND frontend'
-                sh 'docker build -t $BACKEND backend'
+                sh '''
+                docker build -t $FRONTEND frontend
+                docker build -t $BACKEND backend
+                '''
             }
         }
 
-        stage('Push Docker') {
+        stage('Docker Login & Push') {
             steps {
 
-                withCredentials([usernamePassword(
-                    credentialsId: 'dockerhub',
-                    usernameVariable: 'USER',
-                    passwordVariable: 'PASS'
-                )]) {
+                withCredentials([
+                    usernamePassword(
+                        credentialsId: 'dockerhub',
+                        usernameVariable: 'DOCKER_USER',
+                        passwordVariable: 'DOCKER_PASS'
+                    )
+                ]) {
 
-                    sh 'echo $PASS | docker login -u $USER --password-stdin'
+                    sh '''
+                    echo $DOCKER_PASS | docker login -u $DOCKER_USER --password-stdin
+
+                    docker push $FRONTEND
+                    docker push $BACKEND
+
+                    docker logout
+                    '''
                 }
 
-                sh 'docker push $FRONTEND'
-                sh 'docker push $BACKEND'
             }
         }
 
-        stage('Deploy Dev') {
+        stage('Deploy to Development') {
             steps {
-                sh 'docker compose up -d'
+                sh '''
+                docker compose down || true
+                docker compose up -d
+                '''
             }
         }
 
         stage('Health Check') {
             steps {
-                sh 'curl http://localhost:5000/health'
+                sh '''
+                curl --fail http://localhost:5000/health
+                '''
             }
         }
 
-        stage('Production Approval') {
+        stage('Manual Approval') {
             steps {
-                input "Deploy Production?"
+                input message: 'Deploy to Production?', ok: 'Deploy'
             }
         }
 
-        stage('Production Deploy') {
+        stage('Deploy to Production') {
             steps {
-                echo "Deploying Production"
+                sh '''
+                docker compose down
+                docker compose up -d
+                '''
+            }
+        }
+
+        stage('Production Health Check') {
+            steps {
+                sh '''
+                curl --fail http://localhost:5000/health
+                '''
             }
         }
     }
@@ -73,17 +110,39 @@ pipeline {
     post {
 
         success {
-            echo "Pipeline Success"
+
+            echo "Pipeline Completed Successfully."
+
             archiveArtifacts artifacts: '**/*', allowEmptyArchive: true
         }
 
         failure {
-        emailext(
-            subject: "Jenkins Build Failed: ${env.JOB_NAME}",
-            body: "Build #${env.BUILD_NUMBER} has failed.\nCheck: ${env.BUILD_URL}",
-            to: "baskardeva7@gmail.com"
-        )
-    }
-}
+
+            echo "Deployment Failed. Rolling Back..."
+
+            sh '''
+            docker compose down || true
+            docker compose up -d || true
+            '''
+
+            emailext(
+                subject: "Jenkins Build Failed - ${env.JOB_NAME}",
+                body: """
+Job Name : ${env.JOB_NAME}
+
+Build Number : ${env.BUILD_NUMBER}
+
+Build URL :
+${env.BUILD_URL}
+
+The deployment has failed and rollback has been executed.
+""",
+                to: "baskardeva7@gmail.com"
+            )
+        }
+
+        always {
+            cleanWs()
+        }
     }
 }
